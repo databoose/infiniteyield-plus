@@ -7423,32 +7423,44 @@ end)
 local loopGotoFlingActive = false
 
 addcmd('gotofling', {}, function(args, speaker)
-    local players = getPlayer(args[1], speaker)
-    local targetName = players[1]
-    if not targetName then return end
-    local targetPlayer = Players[targetName]
-    if not targetPlayer or not targetPlayer.Character then return end
-    
-    local root = getRoot(speaker.Character)
-    if not root then return end
-    
-    local originalPos = root.CFrame
-    local targetRoot = getRoot(targetPlayer.Character)
-    if not targetRoot then return end
-    
-    execCmd('flyfling')
-    local iters = 0
-    while (iters < 250 ) do
-        root.CFrame = CFrame.new(targetRoot.Position + Vector3.new(0.1, 0.1, 0.1))
-        print(iters)
-        task.wait(0.01)
-        iters = iters + 1
-    end
-     execCmd('unflyfling')
+	local players = getPlayer(args[1], speaker)
+	local targetName = players[1]
+	if not targetName then return end
+	local targetPlayer = Players[targetName]
+	if not targetPlayer or not targetPlayer.Character then return end
+	
+	local char = speaker.Character
+	local root = getRoot(char)
+	if not root then return end
+	
+	local humanoid = char:FindFirstChildOfClass("Humanoid")
+	local originalPos = root.CFrame
+	local targetRoot = getRoot(targetPlayer.Character)
+	if not targetRoot then return end
+	
+	execCmd('fling')
+	
+	local iters = 0
+	while (iters < 250) do
+		-- keep position locked onto the target
+		root.CFrame = targetRoot.CFrame
+		
+		-- force the player to constantly walk forward
+		if humanoid then
+			humanoid:Move(Vector3.new(0, 0, -1), true)
+		end
+		
+		task.wait(0.01)
+		iters = iters + 1
+	end
+	
+	execCmd('unfling')
 
-    if getRoot(speaker.Character) then
-        getRoot(speaker.Character).CFrame = originalPos
-    end
+	-- reset back to original position
+	local currentRoot = getRoot(speaker.Character)
+	if currentRoot then
+		currentRoot.CFrame = originalPos
+	end
 end)
 
 addcmd('loopgotofling', {}, function(args, speaker)
