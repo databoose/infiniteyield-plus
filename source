@@ -4501,6 +4501,11 @@ CMDs[#CMDs + 1] = {NAME = 'showguis', DESC = 'Shows any invisible GUIs'}
 CMDs[#CMDs + 1] = {NAME = 'unshowguis', DESC = 'Undoes showguis'}
 CMDs[#CMDs + 1] = {NAME = 'hideguis', DESC = 'Hides any GUIs in PlayerGui'}
 CMDs[#CMDs + 1] = {NAME = 'unhideguis', DESC = 'Undoes hideguis'}
+-- added commands
+CMDs[#CMDs + 1] = {NAME = 'gotofling [player]', DESC = 'Teleports to player, walkflings for 600ms, then teleports back'}
+CMDs[#CMDs + 1] = {NAME = 'loopgotofling [player]', DESC = 'Loops gotofling on the target player'}
+CMDs[#CMDs + 1] = {NAME = 'unloopgotofling', DESC = 'Stops the gotofling loop'}
+
 CMDs[#CMDs + 1] = {NAME = 'guidelete', DESC = 'Enables backspace to delete GUI'}
 CMDs[#CMDs + 1] = {NAME = 'unguidelete / noguidelete', DESC = 'Disables guidelete'}
 CMDs[#CMDs + 1] = {NAME = 'hideiy', DESC = 'Hides the main IY GUI'}
@@ -4660,6 +4665,7 @@ CMDs[#CMDs + 1] = {NAME = 'maxzoom [num]', DESC = 'Maximum camera zoom'}
 CMDs[#CMDs + 1] = {NAME = 'minzoom [num]', DESC = 'Minimum camera zoom'}
 CMDs[#CMDs + 1] = {NAME = 'camdistance [num]', DESC = 'Changes camera distance from your player'}
 CMDs[#CMDs + 1] = {NAME = 'fov [num]', DESC = 'Adjusts field of view (default is 70)'}
+
 CMDs[#CMDs + 1] = {NAME = 'fixcam / restorecam', DESC = 'Fixes camera'}
 CMDs[#CMDs + 1] = {NAME = 'enableshiftlock / enablesl', DESC = 'Enables the shift lock option'}
 CMDs[#CMDs + 1] = {NAME = 'lookat [player]', DESC = 'Moves your camera view to a player'}
@@ -7306,6 +7312,59 @@ addcmd('vfly',{'vehiclefly'},function(args, speaker)
 	if args[1] and isNumber(args[1]) then
 		vehicleflyspeed = args[1]
 	end
+end)
+
+local loopGotoFlingActive = false
+
+addcmd('gotofling', {}, function(args, speaker)
+    local players = getPlayer(args[1], speaker)
+    local targetName = players[1]
+    if not targetName then return end
+    local targetPlayer = Players[targetName]
+    if not targetPlayer or not targetPlayer.Character then return end
+    
+    local root = getRoot(speaker.Character)
+    if not root then return end
+    
+    local originalPos = root.CFrame
+    local targetRoot = getRoot(targetPlayer.Character)
+    if not targetRoot then return end
+    
+    execCmd('flyfling')
+    local iters = 0
+    while (iters < 250 ) do
+        root.CFrame = CFrame.new(targetRoot.Position + Vector3.new(0.1, 0.1, 0.1))
+        print(iters)
+        task.wait(0.01)
+        iters = iters + 1
+    end
+     execCmd('unflyfling')
+
+    if getRoot(speaker.Character) then
+        getRoot(speaker.Character).CFrame = originalPos
+    end
+end)
+
+addcmd('loopgotofling', {}, function(args, speaker)
+    loopGotoFlingActive = false
+    task.wait(0.1)
+    loopGotoFlingActive = true
+    
+    local targetName = getPlayer(args[1], speaker)[1]
+    if not targetName then return end
+    
+    task.spawn(function()
+        while loopGotoFlingActive do
+            if not speaker.Character or not getRoot(speaker.Character) then break end
+            execCmd('gotofling ' .. targetName)
+            task.wait(0.8) 
+        end
+    end)
+end)
+
+addcmd('unloopgotofling', {}, function(args, speaker)
+    loopGotoFlingActive = false
+    execCmd('unwalkfling')
 end)
 
 addcmd('togglevfly',{},function(args, speaker)
@@ -13083,8 +13142,9 @@ addcmd('removecmd',{'deletecmd'},function(args, speaker)
 end)
 
 addcmd("debug", {}, function(args, speaker)
-    _G.IY_DEBUG = parseBoolean(args[1], true)
-    return _G.IY_DEBUG and "Enabled" or "Disabled"
+    local opt = parseBoolean(args[1], true)
+    _G.IY_DEBUG = opt
+    notify("debug", tostring(opt), 1)
 end)
 
 if IsOnMobile then
@@ -13171,7 +13231,7 @@ function hookCharEvents(plr, instant)
 		if not char then return end
 
 		local humanoid = char:WaitForChild("Humanoid", 10)
-		if not humanoid or not humanoid:IsA("Humanoid") then return end
+		if not humanoid then return end
 
 		local oldHealth = humanoid.Health
 		humanoid.HealthChanged:Connect(function(health)
@@ -13216,8 +13276,7 @@ if not isLegacyChat then
 			if not player then return end
 
             local message = textChatMessage.Text
-            pcall(function() if textChatMessage.WasRewritten == true then message = "(rephrased) " .. textChatMessage.RewrittenText end end)
-            pcall(function() if type(textChatMessage.OriginalText) == "string" then message = textChatMessage.OriginalText end end)
+            pcall(function() if textChatMessage.WasRewritten then message = "(rephrased) " .. textChatMessage.RewrittenText end end)
 
 			if logsEnabled == true then
 				CreateLabel(player.Name, message)
