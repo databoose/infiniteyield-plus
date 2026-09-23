@@ -4501,10 +4501,12 @@ CMDs[#CMDs + 1] = {NAME = 'showguis', DESC = 'Shows any invisible GUIs'}
 CMDs[#CMDs + 1] = {NAME = 'unshowguis', DESC = 'Undoes showguis'}
 CMDs[#CMDs + 1] = {NAME = 'hideguis', DESC = 'Hides any GUIs in PlayerGui'}
 CMDs[#CMDs + 1] = {NAME = 'unhideguis', DESC = 'Undoes hideguis'}
--- added commands
-CMDs[#CMDs + 1] = {NAME = 'gotofling [player]', DESC = 'Teleports to player, walkflings for 600ms, then teleports back'}
+
+-- infiniteyield- new commands
+CMDs[#CMDs + 1] = {NAME = 'gotofling [player]', DESC = 'Teleports to player, flings, then teleports back'}
 CMDs[#CMDs + 1] = {NAME = 'loopgotofling [player]', DESC = 'Loops gotofling on the target player'}
 CMDs[#CMDs + 1] = {NAME = 'unloopgotofling', DESC = 'Stops the gotofling loop'}
+CMDs[#CMDs + 1] = {NAME = 'unload', DESC = 'Unloads the script and resets properties'}
 
 CMDs[#CMDs + 1] = {NAME = 'guidelete', DESC = 'Enables backspace to delete GUI'}
 CMDs[#CMDs + 1] = {NAME = 'unguidelete / noguidelete', DESC = 'Disables guidelete'}
@@ -7039,6 +7041,110 @@ addcmd("exit", {"shutdown", "leave"}, function(args, speaker)
 	game:Shutdown()
 end)
 
+addcmd('unload', {'uninstall', 'iyunload'}, function(args, speaker) 
+    if notify then 
+        pcall(function() notify("Infinite Yield", "Unloading...") end)
+        task.wait(2.5)
+    end
+    
+    task.spawn(function()
+        local stopCmds = {
+            'unfly', 'unnoclip', 'noesp', 'nochams', 'unfling', 'unwalkfling', 
+            'unspin', 'unloopgoto', 'unloopbring', 'unloopspeed', 'unloopjumppower',
+            'unautoclick', 'unautokeypress', 'unantivoid', 'unxray', 'unfullbright',
+            'unswim', 'unfloat', 'unfreecam', 'unview', 'unorbit', 'unstareat',
+            'unrolewatch', 'unstaffwatch', 'unhovername', 'unantifling', 'unfreezeua'
+        }
+        
+        for _, cmdName in ipairs(stopCmds) do
+            pcall(function() execCmd(cmdName .. ' nonotify') end)
+        end
+
+        local connections = {
+            Noclipping, CFloop, brightLoop, xrayLoop, antivoidloop, 
+            antifling, freezingua, walltpTouch, stareLoop, orbit1, orbit2, orbit3,
+            flyKeyDown, flyKeyUp, mfly1, mfly2, spinhats, grabtoolsFunc,
+            deleteGuiInput, alignmentKeys, nbUpdateFunc, partEspTrigger,
+            charPartTrigger, networkPaused, antiAfkCon, staffwatchjoin, 
+            RolewatchConnection, listentoChar, viewDied, viewChanged,
+            CameraChanged, CamMoved, invisFix, invisDied, flingDied, 
+            bangDied, bangLoop, carpetLoop, carpetDied, headSit,
+            PromptButtonHoldBegan, cancelAutoClick, cancelAutoKeyPress,
+            tpwalking, lcLoopFunc, espLoopFunc, addedFunc, teamChange
+        }
+        
+        for _, conn in ipairs(connections) do
+            pcall(function() 
+                if type(conn) == "RBXScriptConnection" and conn.Connected then 
+                    conn:Disconnect() 
+                end
+            end)
+        end
+        
+        -- destroy gui
+        pcall(function() if ScaledHolder then ScaledHolder:Destroy() end end)
+        pcall(function() if PARENT and PARENT ~= COREGUI then PARENT:Destroy() end end)
+        pcall(function() if picker then picker:Destroy() end end)
+        
+        -- restore properties if manipulated
+        pcall(function()
+            workspace.Gravity = oldgrav or 196.2
+            Lighting.GlobalShadows = true
+            Lighting.FogEnd = origsettings and origsettings.fe or 100000
+            Lighting.Brightness = origsettings and origsettings.brt or 2
+            Lighting.ClockTime = origsettings and origsettings.time or 14
+            
+            local hum = speaker.Character and speaker.Character:FindFirstChildWhichIsA("Humanoid")
+            if hum then
+                hum.WalkSpeed = 16
+                hum.JumpPower = 50
+                hum.HipHeight = r15(speaker) and 2.1 or 0
+                hum.PlatformStand = false
+                hum.AutoRotate = true
+            end
+            
+            RunService:Set3dRenderingEnabled(true)
+            SoundService:SetListener(Enum.ListenerType.Camera)
+        end)
+        
+        -- clear iy globals/tables
+        pcall(function()
+            cmds = {}
+            binds = {}
+            WayPoints = {}
+            AllWaypoints = {}
+            pWayPoints = {}
+            aliases = {}
+            customAlias = {}
+            PluginsTable = {}
+            cmdHistory = {}
+            lastCmds = {}
+            toggleOn = {}
+            shade1, shade2, shade3 = {}, {}, {}
+            text1, text2, scroll = {}, {}, {}
+            
+            ESPenabled = false
+            CHMSenabled = false
+            FLYING = false
+            Clip = true
+            swimming = false
+            floating = false
+            flinging = false
+            walkflinging = false
+            invisRunning = false
+            oofing = false
+            spamming = false
+            autoclicking = false
+            autoKeyPressing = false
+            fcRunning = false
+            xrayEnabled = false
+            
+            _G.IY_LOADED = false
+            getgenv().IY_LOADED = false
+        end)
+    end)
+end)
+
 local NoclipParts = {}
 local Noclipping = nil
 addcmd("noclip", {}, function(args, speaker)
@@ -7364,7 +7470,7 @@ end)
 
 addcmd('unloopgotofling', {}, function(args, speaker)
     loopGotoFlingActive = false
-    execCmd('unwalkfling')
+    execCmd('unflyfling')
 end)
 
 addcmd('togglevfly',{},function(args, speaker)
