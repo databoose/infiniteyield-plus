@@ -358,7 +358,7 @@ Title.BorderSizePixel = 0
 Title.Size = UDim2.new(0, 250, 0, 20)
 Title.Font = Enum.Font.SourceSans
 Title.TextSize = 18
-Title.Text = "Infinite Yield FE v" .. currentVersion
+Title.Text = "Infinite Yield+ FE v" .. currentVersion
 
 do
 	local emoji = ({
@@ -4502,7 +4502,7 @@ CMDs[#CMDs + 1] = {NAME = 'unshowguis', DESC = 'Undoes showguis'}
 CMDs[#CMDs + 1] = {NAME = 'hideguis', DESC = 'Hides any GUIs in PlayerGui'}
 CMDs[#CMDs + 1] = {NAME = 'unhideguis', DESC = 'Undoes hideguis'}
 
--- infiniteyield- new commands
+-- infiniteyield+ new commands
 CMDs[#CMDs + 1] = {NAME = 'gotofling [player]', DESC = 'Teleports to player, flings, then teleports back'}
 CMDs[#CMDs + 1] = {NAME = 'loopgotofling [player]', DESC = 'Loops gotofling on the target player'}
 CMDs[#CMDs + 1] = {NAME = 'unloopgotofling', DESC = 'Stops the gotofling loop'}
@@ -7510,6 +7510,7 @@ addcmd('gotofling', {}, function(args, speaker)
 
 	if wasFlying then
 	    execCmd('unfly')
+        task.wait(0.3)
 	end
 	
     execCmd('goto '.. targetName)
@@ -7543,7 +7544,7 @@ addcmd('loopgotofling', {}, function(args, speaker)
         while loopGotoFlingActive do
             if not speaker.Character or not getRoot(speaker.Character) then break end
             execCmd('gotofling ' .. targetName)
-            task.wait(0.8) 
+            task.wait(5) 
         end
     end)
 end)
