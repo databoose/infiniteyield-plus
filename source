@@ -2935,7 +2935,7 @@ defaultsettings = {
 	StayOpen = false;
 	guiScale = defaultGuiScale;
 	espTransparency = 0.3;
-	keepIY = true;
+	keepIY = false;
 	logsEnabled = false;
 	jLogsEnabled = false;
 	aliases = {};
@@ -4507,6 +4507,9 @@ CMDs[#CMDs + 1] = {NAME = 'gotofling [player]', DESC = 'Teleports to player, fli
 CMDs[#CMDs + 1] = {NAME = 'loopgotofling [player]', DESC = 'Loops gotofling on the target player'}
 CMDs[#CMDs + 1] = {NAME = 'unloopgotofling', DESC = 'Stops the gotofling loop'}
 CMDs[#CMDs + 1] = {NAME = 'unload', DESC = 'Unloads the script and resets properties'}
+
+CMDs[#CMDs + 1] = {NAME = 'gravitate', DESC = 'Gravitates towards target player'}
+CMDs[#CMDs + 1] = {NAME = 'ungravitate', DESC = 'Ungravitates towards target player'}
 
 CMDs[#CMDs + 1] = {NAME = 'guidelete', DESC = 'Enables backspace to delete GUI'}
 CMDs[#CMDs + 1] = {NAME = 'unguidelete / noguidelete', DESC = 'Disables guidelete'}
@@ -7412,10 +7415,85 @@ addcmd('vfly',{'vehiclefly'},function(args, speaker)
 	end
 end)
 
+local gravitateLoop = nil
+
+addcmd('gravitate', {'grav'}, function(args, speaker)
+	local players = getPlayer(args[1], speaker)
+	local targetName = players[1]
+	
+	if not targetName then return end
+	local targetPlayer = Players[targetName]
+	if not targetPlayer or not targetPlayer.Character then return end
+
+	if gravitateLoop then 
+		gravitateLoop:Disconnect() 
+		gravitateLoop = nil 
+	end
+
+	local char = speaker.Character
+	local root = getRoot(char)
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	
+	if not root or not hum then return end
+
+	for _, v in pairs(root:GetChildren()) do
+		if v.Name == "GravVelocity" then
+			v:Destroy()
+		end
+	end
+
+	local bv = Instance.new("BodyVelocity")
+	bv.Name = "GravVelocity"
+	bv.MaxForce = Vector3.new(1e5, 0, 1e5)
+	bv.Parent = root
+
+	gravitateLoop = RunService.RenderStepped:Connect(function()
+		if not targetPlayer.Character or not getRoot(targetPlayer.Character) or not root.Parent then
+			execCmd('ungravitate')
+			return
+		end
+
+		local targetRoot = getRoot(targetPlayer.Character)
+		local dir = targetRoot.Position - root.Position
+		local flatDir = Vector3.new(dir.X, 0, dir.Z)
+		local flatDist = flatDir.Magnitude
+		
+		local pullVelocity = Vector3.new(0, 0, 0)
+		
+		-- continuously pull at full speed until physically touching
+		if flatDist > 0.05 then
+			local pullSpeed = 20
+			pullVelocity = flatDir.Unit * pullSpeed
+		end
+		
+		local walkVelocity = hum.MoveDirection * hum.WalkSpeed
+		bv.Velocity = pullVelocity + walkVelocity
+	end)
+end)
+
+addcmd('ungravitate', {'ungrav'}, function(args, speaker)
+	if gravitateLoop then
+		gravitateLoop:Disconnect()
+		gravitateLoop = nil
+	end
+	
+	local char = speaker.Character
+	if char then
+		local root = getRoot(char)
+		if root then
+			local bv = root:FindFirstChild("GravVelocity")
+			if bv then bv:Destroy() end
+		end
+	end
+	
+	notify('Gravitate', 'Stopped gravitating')
+end)
+
 local loopGotoFlingActive = false
 
 addcmd('gotofling', {}, function(args, speaker)
 	local players = getPlayer(args[1], speaker)
+	local wasFlying = FLYING
 	local targetName = players[1]
 	if not targetName then return end
 	local targetPlayer = Players[targetName]
@@ -7429,29 +7507,27 @@ addcmd('gotofling', {}, function(args, speaker)
 	local originalPos = root.CFrame
 	local targetRoot = getRoot(targetPlayer.Character)
 	if not targetRoot then return end
-	
-	execCmd('fling')
-	
-	local iters = 0
-	while (iters < 250) do
-		-- keep position locked onto the target
-		root.CFrame = targetRoot.CFrame
-		
-		-- force the player to constantly walk forward
-		if humanoid then
-			humanoid:Move(Vector3.new(0, 0, -1), true)
-		end
-		
-		task.wait(0.01)
-		iters = iters + 1
+
+	if wasFlying then
+	    execCmd('unfly')
 	end
 	
-	execCmd('unfling')
-
+    execCmd('goto '.. targetName)
+	execCmd('gravitate '.. targetName)
+    execCmd('walkfling')
+	
+	task.wait(3)
+	
+	execCmd('ungravitate')
+    execCmd('unwalkfling')
+    
 	-- reset back to original position
 	local currentRoot = getRoot(speaker.Character)
 	if currentRoot then
 		currentRoot.CFrame = originalPos
+		if wasFlying then
+		    execCmd('fly')
+		end
 	end
 end)
 
